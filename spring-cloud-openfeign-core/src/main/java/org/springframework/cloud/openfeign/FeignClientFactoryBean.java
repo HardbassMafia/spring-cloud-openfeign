@@ -19,6 +19,7 @@ package org.springframework.cloud.openfeign;
 import java.util.Map;
 import java.util.Objects;
 
+import com.sun.javafx.fxml.BeanAdapter;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.FactoryBean;
@@ -48,14 +49,14 @@ import feign.codec.ErrorDecoder;
  * @author Eko Kurniawan Khannedy
  * @author Gregor Zurowski
  */
-class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
-		ApplicationContextAware {
+class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,ApplicationContextAware {
 	/***********************************
 	 * WARNING! Nothing in this class should be @Autowired. It causes NPEs because of some lifecycle race condition.
 	 ***********************************/
 
 	private Class<?> type;
 
+	//serviceId or name or value
 	private String name;
 
 	private String url;
@@ -88,6 +89,11 @@ class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
 		Feign.Builder builder = get(context, Feign.Builder.class)
 				// required values
 				.logger(logger)
+
+		/**
+		    @see org.springframework.cloud.openfeign.FeignClientsConfiguration
+		    encoder decoder contract 在这里被设置进去
+		 */
 				.encoder(get(context, Encoder.class))
 				.decoder(get(context, Decoder.class))
 				.contract(get(context, Contract.class));
@@ -102,8 +108,11 @@ class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
 		FeignClientProperties properties = applicationContext.getBean(FeignClientProperties.class);
 		if (properties != null) {
 			if (properties.isDefaultToProperties()) {
+				//使用FeignContext来配置FeignClient
 				configureUsingConfiguration(context, builder);
+				//使用spring配置文件指定的当前的FeignClient的默认配置类来配置FeignClient
 				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()), builder);
+				//使用spring配置文件指定的当前FeignClient的配置类来配置FeignClient
 				configureUsingProperties(properties.getConfig().get(this.name), builder);
 			} else {
 				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()), builder);
@@ -202,6 +211,7 @@ class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
 	}
 
 	protected <T> T get(FeignContext context, Class<T> type) {
+		//根据当前BeanFactory的名字来获取对应的AppContext
 		T instance = context.getInstance(this.name, type);
 		if (instance == null) {
 			throw new IllegalStateException("No bean found of type " + type + " for "
@@ -214,12 +224,12 @@ class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
 		return context.getInstance(this.name, type);
 	}
 
-	protected <T> T loadBalance(Feign.Builder builder, FeignContext context,
-			HardCodedTarget<T> target) {
+	protected <T> T loadBalance(Feign.Builder builder, FeignContext context, HardCodedTarget<T> target) {
 		Client client = getOptional(context, Client.class);
 		if (client != null) {
 			builder.client(client);
 			Targeter targeter = get(context, Targeter.class);
+			//返回一个代理对象 调用里面的增强方法会调用http请求
 			return targeter.target(this, builder, context, target);
 		}
 
@@ -236,8 +246,10 @@ class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
 	 * @param <T> the target type of the Feign client
 	 * @return a {@link Feign} client created with the specified data and the context information
 	 */
+	@SuppressWarnings("unchecked")
 	<T> T getTarget() {
-		FeignContext context = applicationContext.getBean(FeignContext.class);
+		FeignContext context = applicaitonContext.getBean(FeignContext.class);
+		//一个FeignClient类对应一个ApplicationContext
 		Feign.Builder builder = feign(context);
 
 		if (!StringUtils.hasText(this.url)) {
@@ -249,8 +261,8 @@ class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
 				url = this.name;
 			}
 			url += cleanPath();
-			return (T) loadBalance(builder, context, new HardCodedTarget<>(this.type,
-					this.name, url));
+			//返回的对象为代理后的对象 所以强转应该是没问题的
+			return (T) loadBalance(builder, context, new HardCodedTarget<>(this.type,this.name, url));
 		}
 		if (StringUtils.hasText(this.url) && !this.url.startsWith("http")) {
 			this.url = "http://" + this.url;
@@ -266,8 +278,9 @@ class FeignClientFactoryBean implements FactoryBean<Object>, InitializingBean,
 			builder.client(client);
 		}
 		Targeter targeter = get(context, Targeter.class);
-		return (T) targeter.target(this, builder, context, new HardCodedTarget<>(
-				this.type, this.name, url));
+		//返回一个代理对象 调用里面的增强方法会调用http请求
+		//返回的对象为代理后的对象 所以强转应该是没问题的
+		return (T) targeter.target(this, builder, context, new HardCodedTarget<>(this.type, this.name, url));
 	}
 
 	private String cleanPath() {

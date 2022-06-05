@@ -39,6 +39,9 @@ public class FeignClientProperties {
 
 	private String defaultConfig = "default";
 
+	/**
+	 * 	可以配置  通过 feign.client.@ClientName.clazz = ? 来进行配置
+	 */
 	private Map<String, FeignClientConfiguration> config = new HashMap<>();
 
 	public boolean isDefaultToProperties() {

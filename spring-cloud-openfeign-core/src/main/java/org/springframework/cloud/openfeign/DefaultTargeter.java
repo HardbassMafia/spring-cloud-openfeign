@@ -26,8 +26,8 @@ import feign.Target;
 class DefaultTargeter implements Targeter {
 
 	@Override
-	public <T> T target(FeignClientFactoryBean factory, Feign.Builder feign, FeignContext context,
-						Target.HardCodedTarget<T> target) {
+	public <T> T target(FeignClientFactoryBean factory, Feign.Builder feign, FeignContext context, Target.HardCodedTarget<T> target) {
+		//todolu：spring-cloud-feign的终点  接下来就是Feign-core来实现接口 返回一个代理对象
 		return feign.target(target);
 	}
 }
